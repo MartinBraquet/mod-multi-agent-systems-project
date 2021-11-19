@@ -1,14 +1,11 @@
-
-
 class Dynamics(object):
-
-    def __init__(self, A, B, D):
-        self.Alist = A # list of Ak
-        self.Blist = B # list of Bk
-        self.Dlist = D # list of Dk
+    def __init__(self, Alist, Blist, Dlist, sigmaWlist):
+        self.Alist = Alist # list of Ak
+        self.Blist = Blist # list of Bk
+        self.Dlist = Dlist # list of Dk
+        self.sigmaWlist = sigmaWlist
         
 class Cost(object):
-
     def __init__(self, Ru, Rv, muU, muV, sigmaU, sigmaV):
         self.Rulist = Ru
         self.Rvlist = Rv
@@ -19,6 +16,8 @@ class Cost(object):
         self.sigmaV = sigmaV
 
 class Project(object):
-    def __init__(self, dynamics, cost):
-    self.dynamics = dynamics
-    self.cost = cost
+    def __init__(self, mu0, sigma0, dynamics, cost):
+        self.mu0 = mu0
+        self.sigma0 = sigma0
+        self.dynamics = dynamics
+        self.cost = cost

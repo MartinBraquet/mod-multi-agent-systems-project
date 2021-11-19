@@ -2,14 +2,14 @@ import numpy as np
 from LQFeedbackSolver import * 
 from Utils import * 
 
-def LQFeedbackFunction(A, B1, B2, Q1, Q2, R1, R2, x1, horizon):
+def LQFeedbackFunction(A, B1, B2, Q1, Q2, q1, q2, R1, R2, x1, horizon):
 
     dyn = Dynamics(A, [B1, B2])
     
-    c1 = Cost(Q1)
+    c1 = Cost(Q1, q1)
     add_control_cost(c1, 0, R1)
     
-    c2 = Cost(Q2)
+    c2 = Cost(Q2, q1)
     add_control_cost(c2, 1, R2)
     
     costs = [c1, c2]
