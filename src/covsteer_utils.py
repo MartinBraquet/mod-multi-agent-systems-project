@@ -150,6 +150,115 @@ def solveCCPforU(Dynamics, Cost, Upolicy, Vpolicy,
     Inputs:
         Dynamics -> System Dynamics Class
         Cost -> Covariance Steering Cost Class
+        Upolicy -> (Ubar_value, Lu_value, Ku_value) value of the expressions
+            of PlayerU's policy from the previous iteration
+        Vpolicy -> (Vbar_value, Lv_value, Kv_value) value of the expressions
+            of PlayerV's policy from the previous iteration
+        CCP_iter -> number of CCP iterations
+        solver -> Convex Solver for CCP subproblems
+    Outputs:
+        Success -> flag denotes the convergence
+    """
+    Alist = Dynamics.Alist # list of Ak
+    Blist = Dynamics.Blist # list of Bk
+    Dlist = Dynamics.Dlist # list of Dk
+    dlist = Dynamics.dlist # list of dk
+    sigmaWlist = Dynamics.sigmaWlist
+    mu0 = Dynamics.mu0
+    sigma0 = Dynamics.sigma0
+
+    Rulist = Cost.Ru
+    Rvlist = Cost.Rv
+
+    muU = Cost.muU
+    # muV = Cost.muV
+    sigmaU = Cost.sigmaU
+    # sigmaV = Cost.sigmaV
+    lambda_ = Cost.lambda_
+
+    Ubar_init, Lu_init, Ku_init = Upolicy
+    Vbar_init, Lv_init, Kv_init = Vpolicy
+
+    Gamma, Hu, Hv, Hw, Z, Wbig, Rubig, Rvbig = getMatirces(Dynamics, Cost)
+
+    Ubar, _, Lu, _, Ku, _ = setDecisionVariables(Dynamics,
+                                        Ubar=Ubar_init,
+                                        Lu=Lu_init,
+                                        Ku=Ku_init,
+                                        Vbar=Vbar_init,
+                                        Lv=Lv_init
+                                        Kv=Kv_init)
+
+
+    u, s, v = svd(Rubig)
+    sqrtRubig = u @ np.diag(np.sqrt(s)) @ v
+    u, s, v = svd(sigma0)
+    sqrtSigma0 = u @ np.diag(np.sqrt(s)) @ v
+    u, s, v = svd(Wbig)
+    sqrtWbig = u @ np.diag(np.sqrt(s)) @ v
+    u, s, v = svd(sigmaU)
+    sqrtSigmaU = u @ np.diag(np.sqrt(s)) @ v
+
+    Pf = np.zeros((nx, nx*(N+1)))
+    Pf[:,-nx:] = np.eye(nx)
+
+    control_cost = (cp.norm(Ubar ,2)**2
+                    + cp.norm(sqrtRubig@Lu@sqrtSigma0, "fro")**2
+                    + cp.norm(sqrtRubig@Ku@sqrtWbig, "fro")**2)
+
+    Vbar_value, Lv_value, Kv_value = Vbar_init, Lu_init, Kv_init
+    zeta = (Pf @
+        (cp.hstack([Gamma + Hu@Lu + Hv@Lv_value, Hw + Hu@Ku + Hv@Kv_value])
+                @ np.block([ [sqrtSigma0, np.zeros(nx, nx*N)],
+                             [np.zeros(nx*N, nx), sqrtWbig] ]) )
+                             )
+    mu_f = Pf @ (Gamma @ mu0 + Hw @ Z + Hu @ Ubar + Hv @ Vbar_value)
+
+    cvx_wass_cost = (cp.norm(mu_f-muU,2)**2 + cp.norm(zeta,"fro")**2
+                        + np.trace(sigmaU))
+    ccv_wass_cost = -2 * cp.norm( sqrtSigmaU @ zeta ,"nuc")
+
+    total_cost = control_cost + lambda_ * (cvx_wass_cost + ccv_wass_cost)
+    obj_value_prev = total_cost.value
+    convergence_flag = False
+    for i in range(CCP_iter):
+        zeta0 = zeta.value
+        helper = np.linalg.inv(sqrtm(sqrtSigmaU@zeta0 @ zeta0.T@sqrtSigmaU))
+        concave_grad = sqrtSigmaU @ helper @ sqrtSigmaU @ zeta0
+
+        cvx_subproblem_cost = (control_cost
+                        + lambda_*(cvx_wass_cost
+                        + ccv_wass_cost.value
+                        - 2*cp.trace(concave_grad.T @ (zeta - zeta0)  ) )
+                                )
+        subproblem_obj = cp.Minimize(cvx_subproblem_cost)
+        subprob = cp.Problem(subproblem_obj)
+        subprob.solve(solver=solver)
+        obj_value_new = total_cost.value
+        if np.abs(obj_value_new-obj_value_prev) <= eps:
+            convergence_flag = True
+            break
+
+    Upolicy_value = Ubar.value, Lu.value, Ku.value
+
+    control_cost_v = (np.norm(Vbar ,2)**2
+                    + np.norm(sqrtRvbig@Lv_value@sqrtSigma0, "fro")**2
+                    + np.norm(sqrtRvbig@Kv_value@sqrtWbig, "fro")**2)
+
+    wass_cost_v = (np.norm(mu_f-muV,2)**2 + np.norm(zeta.value,"fro")**2
+                        + np.trace(sigmaV)
+                        - 2 * np.norm( sqrtSigmaV @ zeta.value ,"nuc"))
+
+    total_cost_v = control_cost_v + lambda_ * wass_cost_v
+    
+    return Upolicy_value, convergence_flag, total_cost.value, total_cost_v
+
+def solveCCPforV(Dynamics, Cost, Upolicy, Vpolicy,
+                 CCP_iter=10, solver="MOSEK", eps=1e-4):
+    """
+    Inputs:
+        Dynamics -> System Dynamics Class
+        Cost -> Covariance Steering Cost Class
         Upolicy -> (Ubar, Lu, Ku) where each term is a cvxpy expression
         VpolicyPrev -> (Vbar_value, Lv_value, Kv_value) value of the expressions
             of PlayerV's policy from the previous iteration
@@ -180,7 +289,7 @@ def solveCCPforU(Dynamics, Cost, Upolicy, Vpolicy,
 
     Gamma, Hu, Hv, Hw, Z, Wbig, Rubig, Rvbig = getMatirces(Dynamics, Cost)
 
-    Ubar, Vbar, Lu, Lv, Ku, Kv = setDecisionVariables(Dynamics,
+    _, Vbar, _, Lv, _, Kv = setDecisionVariables(Dynamics,
                                         Ubar=Ubar_init,
                                         Lu=Lu_init,
                                         Ku=Ku_init,
@@ -189,40 +298,40 @@ def solveCCPforU(Dynamics, Cost, Upolicy, Vpolicy,
                                         Kv=Kv_init)
 
 
-    u, s, v = svd(Rubig)
-    sqrtRubig = u @ np.diag(np.sqrt(s)) @ v
+    u, s, v = svd(Rvbig)
+    sqrtRvbig = u @ np.diag(np.sqrt(s)) @ v
     u, s, v = svd(sigma0)
     sqrtSigma0 = u @ np.diag(np.sqrt(s)) @ v
     u, s, v = svd(Wbig)
     sqrtWbig = u @ np.diag(np.sqrt(s)) @ v
-    u, s, v = svd(sigmaU)
-    sqrtSigmaU = u @ np.diag(np.sqrt(s)) @ v
+    u, s, v = svd(sigmaV)
+    sqrtSigmaV = u @ np.diag(np.sqrt(s)) @ v
 
     Pf = np.zeros((nx, nx*(N+1)))
     Pf[:,-nx:] = np.eye(nx)
 
-    control_cost = (cp.norm(Ubar ,2)**2
-                    + cp.norm(sqrtRubig@Lu@sqrtSigma0, "fro")**2
-                    + cp.norm(sqrtRubig@Ku@sqrtWbig, "fro")**2)
+    control_cost = (cp.norm(Vbar ,2)**2
+                    + cp.norm(sqrtRvbig@Lv@sqrtSigma0, "fro")**2
+                    + cp.norm(sqrtRvbig@Kv@sqrtWbig, "fro")**2)
 
-    Lv_value, Kv_value = Lu_init, Kv_init
+    Ubar_value, Lu_value, Ku_value = Ubar_init, Lu_init, Kv_init
     zeta = (Pf @
-        (cp.hstack([Gamma + Hu@Lu + Hv@Lv_value, Hw + Hu@Ku + Hv@Kv_value])
+        (cp.hstack([Gamma + Hu@Lu_value + Hv@Lv, Hw + Hu@Ku_value + Hv@Kv])
                 @ np.block([ [sqrtSigma0, np.zeros(nx, nx*N)],
                              [np.zeros(nx*N, nx), sqrtWbig] ]) )
                              )
-    mu_f = Pf @ (Gamma @ mu0 + Hw @ Z + Hu @ Ubar + Hv @ Vbar_value)
+    mu_f = Pf @ (Gamma @ mu0 + Hw @ Z + Hu @ Ubar_value + Hv @ Vbar)
 
-    cvx_wass_cost = (cp.norm(mu_f-muU,2)**2 + cp.norm(zeta,"fro")
-                        + np.trace(sigmaU))
-    ccv_wass_cost = -2 * cp.norm( sqrtSigmaU @ zeta ,"nuc")
+    cvx_wass_cost = (cp.norm(mu_f-muV,2)**2 + cp.norm(zeta,"fro")
+                        + np.trace(sigmaV))
+    ccv_wass_cost = -2 * cp.norm(sqrtSigmaV @ zeta ,"nuc")
 
     total_cost = control_cost + lambda_ * (cvx_wass_cost + ccv_wass_cost)
     obj_value_prev = total_cost.value
     for i in range(CCP_iter):
         zeta0 = zeta.value
-        helper = np.linalg.inv(sqrtm(sqrtSigmaU@zeta0 @ zeta0.T@sqrtSigmaU))
-        concave_grad = sqrtSigmaU @ helper @ sqrtSigmaU @ zeta0
+        helper = np.linalg.inv(sqrtm(sqrtSigmaV@zeta0 @ zeta0.T@sqrtSigmaU))
+        concave_grad = sqrtSigmaV @ helper @ sqrtSigmaV @ zeta0
 
         cvx_subproblem_cost = (control_cost
                         + lambda_*(cvx_wass_cost
@@ -236,13 +345,9 @@ def solveCCPforU(Dynamics, Cost, Upolicy, Vpolicy,
         if np.abs(obj_value_new-obj_value_prev) <= eps:
             break
 
-    Upolicy_value = Ubar.value, Lu.value, Ku.value
+    Vpolicy_value = Vbar.value, Lv.value, Kv.value
 
-    return Upolicy_value
-
-def solveCCPforV(TupleOfMatrices, Vpolicy, UpolicyPrev,
-                 CCP_iter=10, solver="MOSEK"):
-    return 0
+    return Vpolicy.value
 
 def solveCCPboth():
     return 0
