@@ -6,11 +6,13 @@ import numpy as np
 # For simplicity, assuming that Q, R are time-invariant, and that dynamics are
 # linear time-invariant, i.e. x_{t+1} = A x_t + \sum_i B^i u^i_t.
 class Cost():
-    def __init__(self, Q, Rs):
+    def __init__(self, Q, q, Rs):
         self.Q = Q
+        self.q = q
         self.Rs = Rs
-    def __init__(self, Q):
+    def __init__(self, Q, q):
         self.Q = Q
+        self.q = q
         self.Rs = dict()
 
 #Cost(Q) = Cost(Q, Dict{Int, Matrix{eltype(Q)}}())
@@ -27,7 +29,7 @@ def evaluate(c, xs, us):
 
     total = 0.0
     for tt in range(horizon):
-        total += xs[:, tt].T @ c.Q @ xs[:, tt]
+        total += (xs[:, tt].T @ c.Q + 2 * c.q.T) @ xs[:, tt]
         total += sum(us[jj][:, tt].T @ c.Rs[jj] @ us[jj][:, tt] for jj in c.Rs)
 
     return total
@@ -50,7 +52,7 @@ def udim(dyn, player_idx):
 
 # Function to unroll a set of feedback matrices from an initial condition.
 # Output is a sequence of states xs[:, time] and controls us[player][:, time].
-def unroll_feedback(dyn, Ps, x1):
+def unroll_feedback(dyn, Ps, a, x1):
     assert len(x1) == xdim(dyn)
 
     N = len(Ps)
@@ -64,12 +66,12 @@ def unroll_feedback(dyn, Ps, x1):
     us = [np.zeros((udim(dyn, ii), horizon)) for ii in range(N)]
     for tt in np.arange(1,horizon):
         for ii in range(N):
-            us[ii][:, tt - 1] = -Ps[ii][:, :, tt - 1] @ xs[:, tt - 1]
+            us[ii][:, tt - 1] = -Ps[ii][:, :,tt-1] @ xs[:,tt-1] - a[ii][:,tt-1]
 
-        xs[:, tt] = dyn.A @ xs[:, tt - 1] + sum(dyn.Bs[ii] @ us[ii][:, tt - 1] for ii in range(N))
+        xs[:, tt] = dyn.A @ xs[:,tt-1] + sum(dyn.Bs[ii] @ us[ii][:,tt-1] for ii in range(N))
 
     # Controls at final time.
     for ii in range(N):
-        us[ii][:, horizon-1] = -Ps[ii][:, :, horizon-1] @ xs[:, horizon-1]
+        us[ii][:, horizon-1] = -Ps[ii][:, :, horizon-1] @ xs[:, horizon-1] - a[ii][:,horizon-1]
 
     return xs, us
