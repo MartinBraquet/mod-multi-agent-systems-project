@@ -3,10 +3,10 @@ from scipy.linalg import sqrtm
 
 def regularizeW(mu_f, Sigma_f, mu_d, Sigma_d):
     """
-    This function linearize the Wasserstein distance cost term around the
+    This function linearizes the Wasserstein distance cost term around the
     mean and covariance of the terminal state of the previous solution. The
     outputs can be used as a quadratic cost function for the LQG game problem.
-    Terminal State Cost: x^T Q x + q^T x.
+    Terminal State Cost: x^T Q x + 2 q^T x (+ cst term).
 
     Inputs:
         mu_f    : Terminal Mean Vector -> numpy.ndarray(nx, 1)
@@ -22,8 +22,8 @@ def regularizeW(mu_f, Sigma_f, mu_d, Sigma_d):
     Sigma_dsqrt = sqrtm(Sigma_d)
     Mhelp = np.linalg.inv(sqrtm(Sigma_dsqrt @ Sigma_f @ Sigma_dsqrt))
     M = Sigma_dsqrt @ Mhelp @ Sigma_dsqrt
-    q = (M @ mu_f) - mu_d
     Q = Inx - M
+    q = (M @ mu_f) / 2 - mu_d
     return Q, q
 
 

@@ -47,19 +47,19 @@ def solve_lq_feedback(dyn, costs, horizon):
         F = dyn.A - sum(dyn.Bs[j] @ P[j][:,:,t] for j in range(N))
         beta = - sum(dyn.Bs[j] @ a[j][:,t] for j in range(N))
 
-        Z = [costs[i].Q + sum([P[j][:,:,t].T @ costs[i].Rs[j] @ P[j][:,:,t] for j in costs[i].Rs]) + F.T @ Z[i] @ F for i in range(N)]
-        zeta = [costs[i].q + sum([P[j][:,:,t].T @ costs[i].Rs[j] @ a[j][:,t] for j in costs[i].Rs]) + F.T @ (zeta[i] + Z[i] @ beta) for i in range(N)]
+        Z = [costs[i].Q[t] + sum([P[j][:,:,t].T @ costs[i].Rs[j] @ P[j][:,:,t] for j in costs[i].Rs]) + F.T @ Z[i] @ F for i in range(N)]
+        zeta = [costs[i].q[t] + sum([P[j][:,:,t].T @ costs[i].Rs[j] @ a[j][:,t] for j in costs[i].Rs]) + F.T @ (zeta[i] + Z[i] @ beta) for i in range(N)]
 
     return P, a
 
-def LQFeedbackUnroll(A, B1, B2, Q1, Q2, q1, q2, R1, R2, x1, horizon):
+def LQFeedbackUnroll(A, B1, B2, Q1, Q2, q1, q2, R1, R2, mu0, sigma0, sigmaW, horizon):
 
-    dyn = Dynamics(A, [B1, B2])
+    dyn = Dynamics(A, [B1, B2], mu0, sigma0, sigmaW)
 
     c1 = Cost(Q1, q1)
     add_control_cost(c1, 0, R1)
 
-    c2 = Cost(Q2, q1)
+    c2 = Cost(Q2, q2)
     add_control_cost(c2, 1, R2)
 
     costs = [c1, c2]
@@ -67,7 +67,7 @@ def LQFeedbackUnroll(A, B1, B2, Q1, Q2, q1, q2, R1, R2, x1, horizon):
     # Ensure that the feedback solution satisfies Nash conditions of optimality
     # for each player, holding others' strategies fixed.
     Ps, a = solve_lq_feedback(dyn, costs, horizon)
-    xs, us = unroll_feedback(dyn, Ps, a, x1)
+    xs, sigmas, us = unroll_feedback(dyn, Ps, a)
     nash_costs = [evaluate(c, xs, us) for c in costs]
 
-    return xs, us, nash_costs
+    return xs, sigmas, us, nash_costs
