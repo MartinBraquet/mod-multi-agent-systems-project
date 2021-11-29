@@ -4,6 +4,7 @@ import cvxpy as cp
 from numpy.linalg import svd
 
 from src.ProjectClass import Dynamics, Cost
+from src.utils import Wasserstein_Gaussian
 
 from pdb import set_trace
 
@@ -385,3 +386,57 @@ def solveCCPforV(Dynamics, Cost, Upolicy, Vpolicy,
     total_cost_u = control_cost_u + lambda_ * wass_cost_u
 
     return Vpolicy_value, convergence_flag, total_cost.value, total_cost_u.value
+
+def unroll_dynamics_costs(Dynamics, Cost, Upolicy, Vpolicy):
+
+    Alist = Dynamics.Alist # list of Ak
+    Blist = Dynamics.Blist # list of Bk
+    Dlist = Dynamics.Dlist # list of Dk
+    zlist = Dynamics.zlist # list of zk
+    sigmaWlist = Dynamics.sigmaWlist
+    mu0 = Dynamics.mu0
+    sigma0 = Dynamics.sigma0
+
+    nx, nu, nv = Alist[0].shape[1], Blist[0].shape[1], Dlist[0].shape[1]
+    N = len(Alist)
+
+    Rulist = Cost.Rulist
+    Rvlist = Cost.Rvlist
+
+    muU = Cost.muU
+    muV = Cost.muV
+    sigmaU = Cost.sigmaU
+    sigmaV = Cost.sigmaV
+    lambda_ = Cost.lambda_
+
+    Ubar, Lu, Ku_init = Upolicy
+    Vbar, Lv, Kv_init = Vpolicy
+
+    Gamma, Hu, Hv, Hw, Z, Wbig, Rubig, Rvbig = getMatirces(Dynamics, Cost)
+
+    Ex = (Gamma @ mu0 + Hw @ Z + Hu @ Ubar + Hv @ Vbar)
+    zeta = (np.hstack([Gamma + Hu@Lu + Hv@Lv, Hw + Hu@Ku + Hv@Kv])
+                @ np.block([ [sqrtSigma0, np.zeros((nx, nx*N))],
+                             [np.zeros((nx*N, nx)), sqrtWbig] ]))
+    Exx = zeta @ zeta.T
+
+    Pf = np.zeros((nx, nx*(N+1)))
+    Pf[:,-nx:] = np.eye(nx)
+
+    mu_f, Sigma_f = Pf@Ex, Pf@Exx@Pf.T
+
+    control_cost_u = (np.norm(Ubar, 2)**2
+                    + np.norm(sqrtRubig@Lu@sqrtSigma0, "fro")**2
+                    + np.norm(sqrtRubig@Ku@sqrtWbig, "fro")**2)
+
+    control_cost_v = (np.norm(Vbar, 2)**2
+                    + np.norm(sqrtRvbig@Lv@sqrtSigma0, "fro")**2
+                    + np.norm(sqrtRvbig@Kv@sqrtWbig, "fro")**2)
+
+    wass_u = Wasserstein_Gaussian(mu_f, Sigma_f, muU, sigmaU)
+    wass_v = Wasserstein_Gaussian(mu_f, Sigma_f, muV, sigmaV)
+
+    cost_u = control_cost_u + lambda_ * wass_u
+    cost_v = control_cost_v + lambda_ * wass_v
+
+    return Ex, Exx, cost_u, cost_v, mu_f, Sigma_f
