@@ -3,9 +3,11 @@ import cvxpy as cp
 
 from src.covsteer_utils import solveCCPforU, solveCCPforV
 
-from sys.double_integrator import integrator_cost, integrator_dynamics
+from systems.double_integrator import integrator_cost, integrator_dynamics
 
-def is_policy_close(policy_new, policy_prev, eps=1e-3):
+from pdb import set_trace
+
+def is_policy_close(policy_new, policy_prev, eps=1e-2):
     """
     Check whether the policies between consecutive iterations are close to each
     other with respect to the given tolerance value eps > 0.
@@ -15,8 +17,8 @@ def is_policy_close(policy_new, policy_prev, eps=1e-3):
     K_check = (np.abs(policy_new[2]-policy_prev[2]) <= eps).all()
     return ff_check and L_check and K_check
 
-# Set problem dynamics and cost, It can be changed by importing a dynamics and
-# cost structures from sys folder.
+from pdb import set_trace
+
 prob_dynamics = integrator_dynamics
 prob_cost = integrator_cost
 
@@ -30,28 +32,41 @@ nv = prob_dynamics.Dlist[0].shape[1]
 # Initialize both player's policy to zeros
 Ubar_init, Lu_init, Ku_init = (np.zeros((nu*N, 1)),
                                np.zeros((nu*N, nx)),
-                               np.zeros((nu*N, nx*(N+1))))
+                               np.zeros((nu*N, nx*N)))
 Vbar_init, Lv_init, Kv_init = (np.zeros((nu*N, 1)),
                                np.zeros((nu*N, nx)),
-                               np.zeros((nu*N, nx*(N+1))))
+                               np.zeros((nu*N, nx*N)))
 
-IBR_convergence_flag = False
-eps_conv = 1e-4
-N_IBR = 10
-for i in range(N_IBR):
+U_init = (Ubar_init, Lu_init, Ku_init)
+V_init = (Vbar_init, Lv_init, Kv_init)
 
-    Upolicy_new, conv_CCP, costU, costV = solveCCPforU(
-        prob_dynamics, prob_cost,
-        Upolicy, Vpolicy,
-        CCP_iter=10, solver="MOSEK", eps=1e-4)
+# Gamma, Hu, Hv, Hw, Z, Wbig, Rubig, Rvbig = getMatirces(prob_dynamics, prob_cost)
+#
+# vars = setDecisionVariables(prob_dynamics)
 
-    Vpolicy_new, conv_CCP, costV, costU = solveCCPforV(
-        prob_dynamics, prob_cost,
-        Upolicy, Vpolicy,
-        CCP_iter=10, solver="MOSEK", eps=1e-4)
+N_ibr = 100
+U_current, V_current = U_init, V_init
+CCP_iter = 10
+for i in range(N_ibr):
+    U_new, conv_u, cost_u, cost_v  = solveCCPforU(
+                                        prob_dynamics, prob_cost,
+                                        U_current,
+                                        V_current,
+                                        CCP_iter=CCP_iter)
 
-    if (is_policy_close(Upolicy_new, Upolicy_prev, eps_conv) and
-        is_policy_close(Vpolicy_new, Vpolicy_prev, eps_conv) ):
-        IBR_convergence_flag = True
+    V_new, conv_v, cost_v, cost_u  = solveCCPforV(
+                                        prob_dynamics, prob_cost,
+                                        U_current,
+                                        V_current,
+                                        CCP_iter=CCP_iter)
 
-    pass
+    print('Cost U : {}'.format(cost_u))
+    print('Cost V : {}'.format(cost_v))
+    print('U policy close : {}'.format(is_policy_close(U_new, U_current) ) )
+    print('V policy close : {}'.format(is_policy_close(V_new, V_current) ) )
+
+    if is_policy_close(U_new, U_current) and is_policy_close(V_new, V_current):
+        print('Converged in {} steps'.format(i+1))
+        break
+
+    U_current, V_current = U_new, V_new

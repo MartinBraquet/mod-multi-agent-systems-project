@@ -6,11 +6,11 @@ class Dynamics(object):
     dlist -> [d_0, d_1, ..., d_{N-1}]
     sigmaWlist -> [W_0, W_1, ..., W_{N-1}]
     """
-    def __init__(self, Alist, Blist, Dlist, dlist, sigmaWlist, mu0, sigma0):
+    def __init__(self, Alist, Blist, Dlist, zlist, sigmaWlist, mu0, sigma0):
         self.Alist = Alist # list of Ak
         self.Blist = Blist # list of Bk
         self.Dlist = Dlist # list of Dk
-        self.dlist = dlist # list of dk
+        self.zlist = zlist # list of dk
         self.sigmaWlist = sigmaWlist
         self.mu0 = mu0
         self.sigma0 = sigma0

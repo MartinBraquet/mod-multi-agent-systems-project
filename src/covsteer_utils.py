@@ -1,7 +1,16 @@
 import numpy as np
 from scipy.linalg import sqrtm
 import cvxpy as cp
-from ProjectClass import Dynamics, Cost
+from numpy.linalg import svd
+
+from src.ProjectClass import Dynamics, Cost
+
+from pdb import set_trace
+
+def svd_sqrt(Matrix):
+    u, s, v = svd(Matrix)
+    sqrtMatrix = u @ np.diag(np.sqrt(s)) @ v
+    return sqrtMatrix
 
 def getMatirces(Dynamics, Cost):
     """
@@ -25,7 +34,7 @@ def getMatirces(Dynamics, Cost):
     Gamma = []
     for i in range(N+1):
         Gamma.append(Phi_func(Alist, i, 0))
-    Gamma = cp.vstack(Gamma)
+    Gamma = np.vstack(Gamma)
 
     block_Hu, block_Hv, block_Hw = [], [], []
     for i in range(N+1):
@@ -35,22 +44,27 @@ def getMatirces(Dynamics, Cost):
                 row_Hu.append(Phi_func(Alist, i, j) @ Blist[j])
                 row_Hv.append(Phi_func(Alist, i, j) @ Dlist[j])
                 row_Hw.append(Phi_func(Alist, i, j))
+            else:
+                row_Hu.append(np.zeros((nx, nu)))
+                row_Hv.append(np.zeros((nx, nv)))
+                row_Hw.append(np.zeros((nx, nx)))
         block_Hu.append(np.hstack(row_Hu))
         block_Hv.append(np.hstack(row_Hv))
         block_Hw.append(np.hstack(row_Hw))
     Hu, Hv, Hw = np.vstack(block_Hu), np.vstack(block_Hv), np.vstack(block_Hw)
 
-    Z = np.hstack(zlist)
+    Z = np.vstack(zlist)
 
     Wbig = np.zeros((nx*N, nx*N))
     for k in range(N):
-        Wbig[i*nx:(i+1)*nx, i*nx:(i+1)*nx] = sigmaWlist[k]
+        Wbig[k*nx:(k+1)*nx, k*nx:(k+1)*nx] = sigmaWlist[k]
 
     Rubig = np.zeros((nu*N, nu*N))
     Rvbig = np.zeros((nv*N, nv*N))
+    # set_trace()
     for k in range(N):
-        Rubig[i*nu:(i+1)*nu, i*nu:(i+1)*nu] = Rulist[k]
-        Rvlist[i*nv:(i+1)*nv, i*nv:(i+1)*nv] = Rvlist[k]
+        Rubig[k*nu:(k+1)*nu, k*nu:(k+1)*nu] = Rulist[k]
+        Rvbig[k*nv:(k+1)*nv, k*nv:(k+1)*nv] = Rvlist[k]
 
     return Gamma, Hu, Hv, Hw, Z, Wbig, Rubig, Rvbig
 
@@ -69,7 +83,7 @@ def setDecisionVariables(Dynamics, **init_values):
     nx = Dynamics.Alist[0].shape[1]
     nu = Dynamics.Blist[0].shape[1]
     nv = Dynamics.Dlist[0].shape[1]
-    N = len(Alist)
+    N = len(Dynamics.Alist)
 
     # Extract Initial Values:
     for key, value in init_values.items():
@@ -95,16 +109,17 @@ def setDecisionVariables(Dynamics, **init_values):
     if "Lu" not in init_values.keys():
         Lu_init = np.zeros((nu*N, nx))
     if "Lv" not in init_values.keys():
-        Lv_init = np.zeros((nv*N, 1))
+        Lv_init = np.zeros((nv*N, nx))
     if "Ku" not in init_values.keys():
         Ku_init = np.zeros((nu*N, nx*(N+1)))
     if "Kv" not in init_values.keys():
         Kv_init = np.zeros((nv*N, nx*(N+1)))
 
+    # set_trace()
     # Set decision variables:
     Ubar = cp.Variable((nu*N, 1), value=Ubar_init)
     Vbar =  cp.Variable((nv*N, 1), value=Vbar_init)
-    Lu = cp.Variable((nu*N, nx), value=Lu_init),
+    Lu = cp.Variable((nu*N, nx), value=Lu_init)
     Lv = cp.Variable((nv*N, nx), value=Lv_init)
     block_Ku, block_Kv = [], []
     for i in range(N):
@@ -112,10 +127,10 @@ def setDecisionVariables(Dynamics, **init_values):
         row_Kv = []
         for j in range(N):
             Ku_init_ij = Ku_init[i*nu:(i+1)*nu, j*nx:(j+1)*nx]
-            Kv_init_ij = Kv_init[i*nu:(i+1)*nu, j*nx:(j+1)*nx]
+            Kv_init_ij = Kv_init[i*nv:(i+1)*nv, j*nx:(j+1)*nx]
             if j < i:
-                row_Ku.append(cp.Variable((nu, nx)))
-                row_Kv.append(cp.Variable((nv, nx)))
+                row_Ku.append(cp.Variable((nu, nx), value=Ku_init_ij))
+                row_Kv.append(cp.Variable((nv, nx), value=Kv_init_ij))
             else:
                 row_Ku.append(np.zeros((nu, nx)))
                 row_Kv.append(np.zeros((nv, nx)))
@@ -162,18 +177,21 @@ def solveCCPforU(Dynamics, Cost, Upolicy, Vpolicy,
     Alist = Dynamics.Alist # list of Ak
     Blist = Dynamics.Blist # list of Bk
     Dlist = Dynamics.Dlist # list of Dk
-    dlist = Dynamics.dlist # list of dk
+    zlist = Dynamics.zlist # list of zk
     sigmaWlist = Dynamics.sigmaWlist
     mu0 = Dynamics.mu0
     sigma0 = Dynamics.sigma0
 
-    Rulist = Cost.Ru
-    Rvlist = Cost.Rv
+    nx, nu, nv = Alist[0].shape[1], Blist[0].shape[1], Dlist[0].shape[1]
+    N = len(Alist)
+
+    Rulist = Cost.Rulist
+    Rvlist = Cost.Rvlist
 
     muU = Cost.muU
-    # muV = Cost.muV
+    muV = Cost.muV
     sigmaU = Cost.sigmaU
-    # sigmaV = Cost.sigmaV
+    sigmaV = Cost.sigmaV
     lambda_ = Cost.lambda_
 
     Ubar_init, Lu_init, Ku_init = Upolicy
@@ -186,18 +204,16 @@ def solveCCPforU(Dynamics, Cost, Upolicy, Vpolicy,
                                         Lu=Lu_init,
                                         Ku=Ku_init,
                                         Vbar=Vbar_init,
-                                        Lv=Lv_init
+                                        Lv=Lv_init,
                                         Kv=Kv_init)
 
-
-    u, s, v = svd(Rubig)
-    sqrtRubig = u @ np.diag(np.sqrt(s)) @ v
-    u, s, v = svd(sigma0)
-    sqrtSigma0 = u @ np.diag(np.sqrt(s)) @ v
-    u, s, v = svd(Wbig)
-    sqrtWbig = u @ np.diag(np.sqrt(s)) @ v
-    u, s, v = svd(sigmaU)
-    sqrtSigmaU = u @ np.diag(np.sqrt(s)) @ v
+    # Get Matrix Square Roots:
+    sqrtRubig = svd_sqrt(Rubig)
+    sqrtRvbig = svd_sqrt(Rvbig)
+    sqrtSigma0 = svd_sqrt(sigma0)
+    sqrtWbig = svd_sqrt(Wbig)
+    sqrtSigmaU = svd_sqrt(sigmaU)
+    sqrtSigmaV = svd_sqrt(sigmaV)
 
     Pf = np.zeros((nx, nx*(N+1)))
     Pf[:,-nx:] = np.eye(nx)
@@ -209,14 +225,14 @@ def solveCCPforU(Dynamics, Cost, Upolicy, Vpolicy,
     Vbar_value, Lv_value, Kv_value = Vbar_init, Lu_init, Kv_init
     zeta = (Pf @
         (cp.hstack([Gamma + Hu@Lu + Hv@Lv_value, Hw + Hu@Ku + Hv@Kv_value])
-                @ np.block([ [sqrtSigma0, np.zeros(nx, nx*N)],
-                             [np.zeros(nx*N, nx), sqrtWbig] ]) )
+                @ np.block([ [sqrtSigma0, np.zeros((nx, nx*N))],
+                             [np.zeros((nx*N, nx)), sqrtWbig] ]) )
                              )
     mu_f = Pf @ (Gamma @ mu0 + Hw @ Z + Hu @ Ubar + Hv @ Vbar_value)
 
     cvx_wass_cost = (cp.norm(mu_f-muU,2)**2 + cp.norm(zeta,"fro")**2
                         + np.trace(sigmaU))
-    ccv_wass_cost = -2 * cp.norm( sqrtSigmaU @ zeta ,"nuc")
+    ccv_wass_cost = -2.0 * cp.norm( sqrtSigmaU @ zeta ,"nuc")
 
     total_cost = control_cost + lambda_ * (cvx_wass_cost + ccv_wass_cost)
     obj_value_prev = total_cost.value
@@ -235,23 +251,27 @@ def solveCCPforU(Dynamics, Cost, Upolicy, Vpolicy,
         subprob = cp.Problem(subproblem_obj)
         subprob.solve(solver=solver)
         obj_value_new = total_cost.value
-        if np.abs(obj_value_new-obj_value_prev) <= eps:
+        obj_difference = obj_value_new-obj_value_prev
+        # print(obj_difference/obj_value_prev)
+        if np.abs(obj_difference/obj_value_prev) <= eps:
             convergence_flag = True
             break
+        obj_value_prev = obj_value_new
 
     Upolicy_value = Ubar.value, Lu.value, Ku.value
 
-    control_cost_v = (np.norm(Vbar ,2)**2
-                    + np.norm(sqrtRvbig@Lv_value@sqrtSigma0, "fro")**2
-                    + np.norm(sqrtRvbig@Kv_value@sqrtWbig, "fro")**2)
+    control_cost_v = (cp.norm(Vbar_value ,2)**2
+                    + cp.norm(sqrtRvbig@Lv_value@sqrtSigma0, "fro")**2
+                    + cp.norm(sqrtRvbig@Kv_value@sqrtWbig, "fro")**2)
 
-    wass_cost_v = (np.norm(mu_f-muV,2)**2 + np.norm(zeta.value,"fro")**2
-                        + np.trace(sigmaV)
-                        - 2 * np.norm( sqrtSigmaV @ zeta.value ,"nuc"))
+    wass_cost_v = (cp.norm(mu_f-muV,2)**2
+                        + cp.norm(zeta.value,"fro")**2
+                        + cp.trace(sigmaV)
+                        - 2 * cp.norm( sqrtSigmaV @ zeta.value ,"nuc"))
 
     total_cost_v = control_cost_v + lambda_ * wass_cost_v
-    
-    return Upolicy_value, convergence_flag, total_cost.value, total_cost_v
+
+    return Upolicy_value, convergence_flag, total_cost.value, total_cost_v.value
 
 def solveCCPforV(Dynamics, Cost, Upolicy, Vpolicy,
                  CCP_iter=10, solver="MOSEK", eps=1e-4):
@@ -270,13 +290,16 @@ def solveCCPforV(Dynamics, Cost, Upolicy, Vpolicy,
     Alist = Dynamics.Alist # list of Ak
     Blist = Dynamics.Blist # list of Bk
     Dlist = Dynamics.Dlist # list of Dk
-    dlist = Dynamics.dlist # list of dk
+    zlist = Dynamics.zlist # list of zk
     sigmaWlist = Dynamics.sigmaWlist
     mu0 = Dynamics.mu0
     sigma0 = Dynamics.sigma0
 
-    Rulist = Cost.Ru
-    Rvlist = Cost.Rv
+    nx, nu, nv = Alist[0].shape[1], Blist[0].shape[1], Dlist[0].shape[1]
+    N = len(Alist)
+
+    Rulist = Cost.Rulist
+    Rvlist = Cost.Rvlist
 
     muU = Cost.muU
     muV = Cost.muV
@@ -294,18 +317,16 @@ def solveCCPforV(Dynamics, Cost, Upolicy, Vpolicy,
                                         Lu=Lu_init,
                                         Ku=Ku_init,
                                         Vbar=Vbar_init,
-                                        Lv=Lv_init
+                                        Lv=Lv_init,
                                         Kv=Kv_init)
 
-
-    u, s, v = svd(Rvbig)
-    sqrtRvbig = u @ np.diag(np.sqrt(s)) @ v
-    u, s, v = svd(sigma0)
-    sqrtSigma0 = u @ np.diag(np.sqrt(s)) @ v
-    u, s, v = svd(Wbig)
-    sqrtWbig = u @ np.diag(np.sqrt(s)) @ v
-    u, s, v = svd(sigmaV)
-    sqrtSigmaV = u @ np.diag(np.sqrt(s)) @ v
+    # Get Matrix Square Roots:
+    sqrtRubig = svd_sqrt(Rubig)
+    sqrtRvbig = svd_sqrt(Rvbig)
+    sqrtSigma0 = svd_sqrt(sigma0)
+    sqrtWbig = svd_sqrt(Wbig)
+    sqrtSigmaU = svd_sqrt(sigmaU)
+    sqrtSigmaV = svd_sqrt(sigmaV)
 
     Pf = np.zeros((nx, nx*(N+1)))
     Pf[:,-nx:] = np.eye(nx)
@@ -317,17 +338,18 @@ def solveCCPforV(Dynamics, Cost, Upolicy, Vpolicy,
     Ubar_value, Lu_value, Ku_value = Ubar_init, Lu_init, Kv_init
     zeta = (Pf @
         (cp.hstack([Gamma + Hu@Lu_value + Hv@Lv, Hw + Hu@Ku_value + Hv@Kv])
-                @ np.block([ [sqrtSigma0, np.zeros(nx, nx*N)],
-                             [np.zeros(nx*N, nx), sqrtWbig] ]) )
+                @ np.block([ [sqrtSigma0, np.zeros((nx, nx*N))],
+                             [np.zeros((nx*N, nx)), sqrtWbig] ]) )
                              )
     mu_f = Pf @ (Gamma @ mu0 + Hw @ Z + Hu @ Ubar_value + Hv @ Vbar)
 
-    cvx_wass_cost = (cp.norm(mu_f-muV,2)**2 + cp.norm(zeta,"fro")
+    cvx_wass_cost = (cp.norm(mu_f-muV,2)**2 + cp.norm(zeta,"fro")**2
                         + np.trace(sigmaV))
     ccv_wass_cost = -2 * cp.norm(sqrtSigmaV @ zeta ,"nuc")
 
     total_cost = control_cost + lambda_ * (cvx_wass_cost + ccv_wass_cost)
     obj_value_prev = total_cost.value
+    convergence_flag = False
     for i in range(CCP_iter):
         zeta0 = zeta.value
         helper = np.linalg.inv(sqrtm(sqrtSigmaV@zeta0 @ zeta0.T@sqrtSigmaU))
@@ -342,12 +364,24 @@ def solveCCPforV(Dynamics, Cost, Upolicy, Vpolicy,
         subprob = cp.Problem(subproblem_obj)
         subprob.solve(solver=solver)
         obj_value_new = total_cost.value
-        if np.abs(obj_value_new-obj_value_prev) <= eps:
+        obj_difference = obj_value_new-obj_value_prev
+        # print(obj_difference/obj_value_prev)
+        if np.abs(obj_difference/obj_value_prev) <= eps:
+            convergence_flag = True
             break
+        obj_value_prev = obj_value_new
 
     Vpolicy_value = Vbar.value, Lv.value, Kv.value
 
-    return Vpolicy.value
+    control_cost_u = (cp.norm(Ubar_value ,2)**2
+                    + cp.norm(sqrtRubig@Lu_value@sqrtSigma0, "fro")**2
+                    + cp.norm(sqrtRubig@Ku_value@sqrtWbig, "fro")**2)
 
-def solveCCPboth():
-    return 0
+    wass_cost_u = (cp.norm(mu_f-muU,2)**2
+                        + cp.norm(zeta.value,"fro")**2
+                        + cp.trace(sigmaU)
+                        - 2 * cp.norm( sqrtSigmaU @ zeta.value ,"nuc"))
+
+    total_cost_u = control_cost_u + lambda_ * wass_cost_u
+
+    return Vpolicy_value, convergence_flag, total_cost.value, total_cost_u.value
