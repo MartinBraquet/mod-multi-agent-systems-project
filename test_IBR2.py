@@ -5,7 +5,6 @@ from matplotlib import pyplot as plt
 from src.covsteer_utils import solveCCPforU, solveCCPforV, unroll_dynamics_costs
 
 from systems.double_integrator import integrator_cost, integrator_dynamics
-from systems.random_system import rand_cost, rand_dynamics
 
 from pdb import set_trace
 
@@ -22,10 +21,8 @@ def is_policy_close(policy_new, policy_prev, eps=1e-2):
 plt.rcParams["savefig.bbox"] = 'tight'
 plt.rcParams["text.usetex"] = True
 
-# prob_dynamics = integrator_dynamics
-# prob_cost = integrator_cost
-prob_dynamics = rand_dynamics
-prob_cost = rand_cost
+prob_dynamics = integrator_dynamics
+prob_cost = integrator_cost
 
 # Problem horizon:
 N = len(prob_dynamics.Alist)
@@ -55,7 +52,7 @@ V_init = (Vbar_init, Lv_init, Kv_init)
 
 N_ibr = 1000
 U_current, V_current = U_init, V_init
-CCP_iter = 10
+CCP_iter = 20
 cost_u_list, cost_v_list = [], []
 policy_change_u, policy_change_v = [], []
 
@@ -84,8 +81,6 @@ for i in range(N_ibr):
 
     print('Cost U : {}'.format(cost_u))
     print('Cost V : {}'.format(cost_v))
-    print('U policy close : {}'.format(is_policy_close(U_new, U_current) ) )
-    print('V policy close : {}'.format(is_policy_close(V_new, V_current) ) )
     print('----')
 
     Ubar_diff = np.linalg.norm(U_new[0]-U_current[0], 2)
@@ -101,9 +96,6 @@ for i in range(N_ibr):
     if is_policy_close(U_new, U_current) and is_policy_close(V_new, V_current):
         print('Converged in {} steps'.format(i+1))
         break
-    # if i == 79:
-    #     pass # Just for 1 example to show that IBR diverges
-    #     break
 
     U_current, V_current = U_new, V_new
 
@@ -116,9 +108,11 @@ np.save('delta_v.npy', policy_change_v)
 np.save('cost_u.npy', np.array(cost_u_list))
 np.save('cost_v.npy', np.array(cost_v_list))
 
+# set_trace()
+
 Ex, Exx, cost_u, cost_v, mu_f, Sigma_f  = unroll_dynamics_costs(
-                                            prob_dynamics,
-                                            prob_cost,
+                                            integrator_dynamics,
+                                            integrator_cost,
                                             U_current,
                                             V_current)
 
@@ -126,3 +120,33 @@ traj_data = (Ex, Exx, N, nx, nu, nv,
              muU, muV, sigmaU, sigmaV,
              U_current, V_current)
 np.save('traj_data.npy', traj_data)
+
+# set_trace()
+# policy_data = (U_current, V_current)
+# np.save('policy_data.npy', policy_data)
+
+# fig_u, ax_u = plt.subplots()
+# ax_u.plot(policy_change_u[:,0], label=r'$\Delta \bar{U}$')
+# ax_u.plot(policy_change_u[:,1], label=r'$\Delta L_{u}$')
+# ax_u.plot(policy_change_u[:,2], label=r'$\Delta K_{u}$')
+# ax_u.legend(prop={'size':12})
+#
+# fig_v, ax_v = plt.subplots()
+# ax_v.plot(policy_change_v[:,0], label=r'$\Delta \bar{V}$')
+# ax_v.plot(policy_change_v[:,1], label=r'$\Delta L_{v}$')
+# ax_v.plot(policy_change_v[:,2], label=r'$\Delta K_{v}$')
+# ax_v.legend(prop={'size':12})
+#
+# fig_u_half, ax_u_half = plt.subplots()
+# ax_u_half.plot(policy_change_u[int(i/2):,0], label=r'$\Delta \bar{U}$')
+# ax_u_half.plot(policy_change_u[int(i/2):,1], label=r'$\Delta L_{u}$')
+# ax_u_half.plot(policy_change_u[int(i/2):,2], label=r'$\Delta K_{u}$')
+# ax_u_half.legend(prop={'size':12})
+#
+# fig_v_half, ax_v_half = plt.subplots()
+# ax_v_half.plot(policy_change_v[int(i/2):,0], label=r'$\Delta \bar{V}$')
+# ax_v_half.plot(policy_change_v[int(i/2):,1], label=r'$\Delta L_{v}$')
+# ax_v_half.plot(policy_change_v[int(i/2):,2], label=r'$\Delta K_{v}$')
+# ax_v_half.legend(prop={'size':12})
+#
+# plt.show()

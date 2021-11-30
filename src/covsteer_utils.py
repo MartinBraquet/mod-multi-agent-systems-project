@@ -409,10 +409,16 @@ def unroll_dynamics_costs(Dynamics, Cost, Upolicy, Vpolicy):
     sigmaV = Cost.sigmaV
     lambda_ = Cost.lambda_
 
-    Ubar, Lu, Ku_init = Upolicy
-    Vbar, Lv, Kv_init = Vpolicy
+    Ubar, Lu, Ku = Upolicy
+    Vbar, Lv, Kv = Vpolicy
 
     Gamma, Hu, Hv, Hw, Z, Wbig, Rubig, Rvbig = getMatirces(Dynamics, Cost)
+
+    sqrtSigma0 = svd_sqrt(sigma0)
+    sqrtWbig = svd_sqrt(Wbig)
+    sqrtRubig = svd_sqrt(Rubig)
+    sqrtRvbig = svd_sqrt(Rvbig)
+
 
     Ex = (Gamma @ mu0 + Hw @ Z + Hu @ Ubar + Hv @ Vbar)
     zeta = (np.hstack([Gamma + Hu@Lu + Hv@Lv, Hw + Hu@Ku + Hv@Kv])
@@ -425,13 +431,13 @@ def unroll_dynamics_costs(Dynamics, Cost, Upolicy, Vpolicy):
 
     mu_f, Sigma_f = Pf@Ex, Pf@Exx@Pf.T
 
-    control_cost_u = (np.norm(Ubar, 2)**2
-                    + np.norm(sqrtRubig@Lu@sqrtSigma0, "fro")**2
-                    + np.norm(sqrtRubig@Ku@sqrtWbig, "fro")**2)
+    control_cost_u = (np.linalg.norm(Ubar, 2)**2
+                    + np.linalg.norm(sqrtRubig@Lu@sqrtSigma0, "fro")**2
+                    + np.linalg.norm(sqrtRubig@Ku@sqrtWbig, "fro")**2)
 
-    control_cost_v = (np.norm(Vbar, 2)**2
-                    + np.norm(sqrtRvbig@Lv@sqrtSigma0, "fro")**2
-                    + np.norm(sqrtRvbig@Kv@sqrtWbig, "fro")**2)
+    control_cost_v = (np.linalg.norm(Vbar, 2)**2
+                    + np.linalg.norm(sqrtRvbig@Lv@sqrtSigma0, "fro")**2
+                    + np.linalg.norm(sqrtRvbig@Kv@sqrtWbig, "fro")**2)
 
     wass_u = Wasserstein_Gaussian(mu_f, Sigma_f, muU, sigmaU)
     wass_v = Wasserstein_Gaussian(mu_f, Sigma_f, muV, sigmaV)
