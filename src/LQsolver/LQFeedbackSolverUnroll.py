@@ -29,10 +29,10 @@ def solve_lq_feedback(dyn, costs, horizon):
         Ba = np.array([])
         for i in range(N):
             Bpi = dyn.Bs[i].T @ Z[i] @ dyn.A
-            Bp = np.vstack((Bp,Bpi)) if Bp.size else Bpi
+            Bp = np.vstack([Bp,Bpi]) if Bp.size else Bpi
 
             Bai = dyn.Bs[i].T @ zeta[i]
-            Ba = np.vstack((Ba,Bai)) if Ba.size else Bai
+            Ba = np.hstack([Ba,Bai]) if Ba.size else Bai
 
         Psol = np.linalg.solve(M, Bp)
         asol = np.linalg.solve(M, Ba)
@@ -70,4 +70,4 @@ def LQFeedbackUnroll(A, B1, B2, Q1, Q2, q1, q2, R1, R2, mu0, sigma0, sigmaW, hor
     xs, sigmas, us = unroll_feedback(dyn, Ps, a)
     nash_costs = [evaluate(c, xs, us) for c in costs]
 
-    return xs, sigmas, us, nash_costs
+    return xs, sigmas, us, Ps, a, nash_costs

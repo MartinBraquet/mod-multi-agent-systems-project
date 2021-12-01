@@ -73,9 +73,10 @@ def unroll_feedback(dyn, Ps, a):
         for ii in range(N):
             us[ii][:, tt - 1] = -Ps[ii][:, :,tt-1] @ xs[:,tt-1] - a[ii][:,tt-1]
 
-        w = np.random.normal(np.zeros(xdim(dyn)), dyn.sigmaW)
-        xs[:, tt] = dyn.A @ xs[:,tt-1] + sum(dyn.Bs[ii] @ us[ii][:,tt-1] for ii in range(N)) + w
-        sigmas[tt] = dyn.A @ sigmas[tt-1] @ dyn.A.T + dyn.sigmaW
+        #w = np.random.normal(np.zeros(xdim(dyn)), dyn.sigmaW)
+        xs[:, tt] = dyn.A @ xs[:,tt-1] + sum(dyn.Bs[ii] @ us[ii][:,tt-1] for ii in range(N)) # + w
+        Acl = dyn.A - sum(dyn.Bs[ii] @ Ps[ii][:,:,tt-1] for ii in range(N))
+        sigmas[tt] = Acl  @ sigmas[tt-1] @ Acl.T + dyn.sigmaW
 
     # Controls at final time.
     for ii in range(N):

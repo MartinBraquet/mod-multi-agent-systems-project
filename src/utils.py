@@ -46,7 +46,7 @@ def Wasserstein_Gaussian(mu_f, Sigma_f, mu_d, Sigma_d):
     return W2
 
 # Function to unroll the open-loop control inputs
-def unroll_OpenLoop(dyn, us, vs):
+def unroll_OpenLoop(dyn, us, vs, Ps):
 
     A = dyn.Alist
     B = dyn.Blist
@@ -64,9 +64,10 @@ def unroll_OpenLoop(dyn, us, vs):
     sigmas = [np.zeros((N, N))] * horizon
     sigmas[0] = sigma0
     for t in np.arange(1,horizon):
-        w = np.random.normal(np.zeros(N), sigmaW[t])
-        mus[:, t] = A[t] @ mus[:, t-1] + B[t] @ us[:,t] + D[t] @ vs[:,t] + w
-        sigmas[t] = A[t] @ sigmas[t-1] @ A[t].T + sigmaW[t]
+        #w = np.random.normal(np.zeros(N), sigmaW[t])
+        mus[:, t] = A[t] @ mus[:, t-1] + B[t] @ us[:,t] + D[t] @ vs[:,t] # + w
+        Acl = A[t] - B[t] @ Ps[0][:,:,t] - D[t] @ Ps[1][:,:,t]
+        sigmas[t] = Acl  @ sigmas[t-1] @ Acl.T + sigmaW[t]
 
     return mus, sigmas
 
