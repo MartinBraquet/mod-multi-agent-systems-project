@@ -4,7 +4,7 @@ sys.path.append('LQsolver')
 
 from ProjectClass import Project, Dynamics, Cost
 from iterativeLQG import IterativeLQG
-from plotting import plot_2dsys
+from plotting import plot_2dsys, plotAnim2D
 import matplotlib.pyplot as plt
 
 def state4D():
@@ -12,7 +12,7 @@ def state4D():
     dt = .05
 
     # Cost
-    Ru = np.diag((1, 1))
+    Ru = np.diag((2, 2))
     Rulist = [Ru] * horizon
 
     Rv = np.diag((1, 1))
@@ -20,13 +20,13 @@ def state4D():
 
     # Desired final distributions
     mu0 = np.array([0, 0, 0, 0]) # -> Starts at [1,0]
-    sigma0 = np.diag((.01, .01, .01, .01))
+    sigma0 = np.diag((.01, .01, .001, .001))
 
-    muU = np.array([0, 0, 0, 0]) # -> P1 steers to [0,0]
-    sigmaU = np.diag((.01, .01, .01, .01))
+    muU = np.array([1, 0, 0, 0]) # -> P1 steers to [0,0]
+    sigmaU = np.diag((.3, .1, .06, .06))
 
-    muV = np.array([4, 4, 0, 0]) # -> P2 steers to [1,1]
-    sigmaV = np.diag((.2, .9, .06, .06))
+    muV = np.array([0, 1, 0, 0]) # -> P2 steers to [1,1]
+    sigmaV = np.diag((.1, .3, .06, .06))
 
     lambda_ = 1
 
@@ -127,13 +127,11 @@ def main():
     
     if project4D:
         c = project.cost
-        xsStacked = np.array([])
         sigmas2D = []
         for t in range(xs.shape[1]):
-            xsStacked = np.hstack([xsStacked,xs[0:2,t]])
             sigmas2D.append(sigmas[t][0:2,0:2])
         horizon = len(sigmas)-1; nx = 2; nu = 2; nv = 2        
-        plot_2dsys(xsStacked, sigmas2D, horizon, nx, nu, nv, c.muU[0:2], c.muV[0:2], c.sigmaU[0:2,0:2], c.sigmaV[0:2,0:2], 1)
+        plot_2dsys(xs[0:2,:], sigmas2D, horizon, nx, nu, nv, c.muU[0:2], c.muV[0:2], c.sigmaU[0:2,0:2], c.sigmaV[0:2,0:2], 1)
         #plt.xlim(-1, 1)
         #plt.ylim(-1, 1)
         plt.xlabel('x')
@@ -148,7 +146,14 @@ def main():
         plt.xlabel('# Iterations')
         plt.ylabel('Error')
         plt.legend((r'$P^*$ - P1', r'$P^*$ - P2', r'$\alpha^*$ - P1', r'$\alpha^*$ - P2'))
+        plt.suptitle('Convergence', fontsize=14)
+        #plt.savefig('conv1.png')
         plt.show()
+        
+        plotAnim2D(xs[0:2,:], sigmas2D, horizon, nx, 
+                   c.muU[0:2], c.muV[0:2], c.sigmaU[0:2,0:2], c.sigmaV[0:2,0:2], 
+                   'anim1.gif', 'Different desired means', 1)
+        
     
 
 
