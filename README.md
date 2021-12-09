@@ -14,8 +14,15 @@ Activate environment: `source env/bin/activate`
 
 Install requirements: `pip install -r requirements.txt`
 
+
 ## Simulation
+
+### Iterative Linear Quadratic Gaussian
 
 Run `python3 src/test_projectLQG.py` to obtain the simulation results for the LQG algorithm.
 
-Run `python3 src/test_projectIBR.py` to obtain the simulation results for the IBR algorithm.
+### Iterative Best Response
+
+Run `python3 src/test_projectIBR.py` to obtain the simulation results for the IBR algorithm (for this, the MOSEK package requires a license which can be installed at https://www.mosek.com/products/academic-licenses/).
+
+Then run `python3 src/plotIBR.py` to plot the results for the IBR algorithm.

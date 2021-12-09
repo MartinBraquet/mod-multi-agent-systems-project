@@ -40,7 +40,7 @@ def Wasserstein_Gaussian(mu_f, Sigma_f, mu_d, Sigma_d):
         dist    : squared Wasserstein distance -> scalar
     """
     Sigma_dsqrt = sqrtm(Sigma_d)
-    W2 = np.linalg.norm(mu_f - mu_d)**2 + np.trace(Sigma_f + Sigma_d
+    W2 = np.linalg.norm(mu_f - mu_d, 2)**2 + np.trace(Sigma_f + Sigma_d
                        - 2* sqrtm(Sigma_dsqrt @ Sigma_f @ Sigma_dsqrt))
 
     return W2
