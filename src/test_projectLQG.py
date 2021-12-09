@@ -4,7 +4,7 @@ sys.path.append('LQsolver')
 
 from ProjectClass import Project, Dynamics, Cost
 from iterativeLQG import IterativeLQG
-from plotting import plot_2dsys, plotAnim2D
+from plottingLQG import plot_2dsys, plotAnim2D
 import matplotlib.pyplot as plt
 
 def state4D():
