@@ -8,3 +8,7 @@ Activate environment: `source env/bin/activate`
 
 Install requirements: `pip install -r requirements.txt`
 
+Additionally (for IBR only), the MOSEK package requires a license which can be installed at https://www.mosek.com/products/academic-licenses/.
+
+
+Then run 'src/plotIBR.py' to plot the results 

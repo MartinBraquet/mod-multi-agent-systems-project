@@ -27,8 +27,6 @@ class Cost(object):
         self.lambda_ = lambda_
 
 class Project(object):
-    def __init__(self, mu0, sigma0, dynamics, cost):
-        self.mu0 = mu0
-        self.sigma0 = sigma0
+    def __init__(self, dynamics, cost):
         self.dynamics = dynamics
         self.cost = cost

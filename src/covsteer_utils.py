@@ -3,8 +3,8 @@ from scipy.linalg import sqrtm
 import cvxpy as cp
 from numpy.linalg import svd
 
-from src.ProjectClass import Dynamics, Cost
-from src.utils import Wasserstein_Gaussian
+from ProjectClass import Dynamics, Cost
+from utils import Wasserstein_Gaussian
 
 from pdb import set_trace
 

@@ -1,9 +1,9 @@
 import numpy as np
 import cvxpy as cp
 
-from src.covsteer_utils import solveCCPforU, solveCCPforV
-from src.covsteer_utils import getMatirces
-from src.covsteer_utils import setDecisionVariables
+from covsteer_utils import solveCCPforU, solveCCPforV
+from covsteer_utils import getMatirces
+from covsteer_utils import setDecisionVariables
 
 from systems.double_integrator import integrator_cost, integrator_dynamics
 
