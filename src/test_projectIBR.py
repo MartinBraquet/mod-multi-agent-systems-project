@@ -8,6 +8,9 @@ from systems.double_integrator import integrator_cost, integrator_dynamics
 from systems.random_system import rand_cost, rand_dynamics
 
 from pdb import set_trace
+import os, sys
+if len(os.path.dirname(sys.argv[0])) != 0:
+    os.chdir(os.path.dirname(sys.argv[0]))
 
 saveDataFolder = 'IBR data/'
 

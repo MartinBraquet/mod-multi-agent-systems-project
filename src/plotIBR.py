@@ -4,6 +4,10 @@ from plottingIBR import plot_2dsys
 
 from pdb import set_trace
 
+import os, sys
+if len(os.path.dirname(sys.argv[0])) != 0:
+    os.chdir(os.path.dirname(sys.argv[0]))
+
 importDataFolder = 'IBR data/'
 saveFolder = '../resultsIBR/'
 

@@ -6,3 +6,4 @@ osqp==0.6.2.post0
 qdldl==0.1.5.post0
 scipy==1.7.2
 scs==2.1.4
+matplotlib==3.5.0

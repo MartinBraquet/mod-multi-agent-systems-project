@@ -1,11 +1,16 @@
 import numpy as np
 import sys
+import os
+if len(os.path.dirname(sys.argv[0])) != 0:
+    os.chdir(os.path.dirname(sys.argv[0]))
 sys.path.append('LQsolver')
 
 from ProjectClass import Project, Dynamics, Cost
 from iterativeLQG import IterativeLQG
 from plottingLQG import plot_2dsys, plotAnim2D
 import matplotlib.pyplot as plt
+
+animName = 'newAnim'
 
 def state4D():
     horizon = 100
@@ -152,7 +157,7 @@ def main():
         
         plotAnim2D(xs[0:2,:], sigmas2D, horizon, nx, 
                    c.muU[0:2], c.muV[0:2], c.sigmaU[0:2,0:2], c.sigmaV[0:2,0:2], 
-                   'anim1.gif', 'Different desired means', 1)
+                   '../anims/' + animName + '.gif', 'Different desired means', 1)
         
     
 
