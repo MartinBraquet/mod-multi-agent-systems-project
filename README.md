@@ -26,3 +26,5 @@ Run `python3 src/test_projectLQG.py` to obtain the simulation results for the LQ
 Run `python3 src/test_projectIBR.py` to obtain the simulation results for the IBR algorithm (for this, the MOSEK package requires a license which can be installed at https://www.mosek.com/products/academic-licenses/).
 
 Then run `python3 src/plotIBR.py` to plot the results for the IBR algorithm.
+
+![Alt Text](animsLQG/anim1.gif)
